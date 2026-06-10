@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LogMonitor — Dashboard de Monitoramento Logístico</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base:    #0b0f1a;
+    --bg-panel:   #111827;
+    --bg-card:    #1a2236;
+    --bg-hover:   #1f2d45;
+    --border:     #1e3a5f;
+    --border-dim: #162033;
+
+    --text-primary:   #e8f0fe;
+    --text-secondary: #8ba3c1;
+    --text-dim:       #4a6380;
+
+    --accent-blue:   #3b82f6;
+    --accent-cyan:   #06b6d4;
+    --accent-ok:     #22c55e;
+    --accent-warn:   #f59e0b;
+    --accent-danger: #ef4444;
+    --accent-purple: #a78bfa;
+
+    --chart-bar: #1e3a5f;
+    --chart-fill: #3b82f6;
+
+    --font-main: 'Space Grotesk', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-main);
+    background: var(--bg-base);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 58px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-dim);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: .5px;
+  }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 7px;
+    display: grid; place-items: center;
+    font-size: .8rem;
+  }
+  .logo span { color: var(--text-secondary); font-weight: 400; font-size: .8rem; margin-left: 4px; }
+  .topbar-meta {
+    display: flex; align-items: center; gap: 18px;
+    font-size: .78rem; color: var(--text-secondary); font-family: var(--font-mono);
+  }
+  .live-dot {
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--accent-ok);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  /* ── FILTERS BAR ── */
+  .filters {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 28px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-dim);
+  }
+  .filter-label { font-size: .72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .6px; }
+  select, .btn-filter {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    font-size: .8rem;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color .2s;
+  }
+  select:hover, .btn-filter:hover { border-color: var(--accent-blue); }
+  select:focus { outline: none; border-color: var(--accent-blue); }
+  .btn-filter.active { border-color: var(--accent-blue); color: var(--accent-cyan); }
+  .btn-reset {
+    margin-left: auto;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-secondary); font-size: .78rem;
+    padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    font-family: var(--font-main);
+  }
+  .btn-reset:hover { border-color: var(--accent-danger); color: var(--accent-danger); }
+
+  /* ── MAIN GRID ── */
+  .main { padding: 20px 28px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── KPI ROW ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .kpi {
+    background: var(--bg-card);
+    border: 1px solid var(--border-dim);
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 4px;
+    position: relative; overflow: hidden;
+    transition: border-color .2s;
+  }
+  .kpi:hover { border-color: var(--border); }
+  .kpi::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  }
+  .kpi.ok::before    { background: var(--accent-ok); }
+  .kpi.warn::before  { background: var(--accent-warn); }
+  .kpi.danger::before{ background: var(--accent-danger); }
+  .kpi.blue::before  { background: var(--accent-blue); }
+  .kpi.cyan::before  { background: var(--accent-cyan); }
+  .kpi-label { font-size: .7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .6px; }
+  .kpi-value { font-size: 1.75rem; font-weight: 700; line-height: 1; font-family: var(--font-mono); }
+  .kpi-sub   { font-size: .7rem; color: var(--text-secondary); }
+  .kpi.danger .kpi-value { color: var(--accent-danger); }
+  .kpi.warn   .kpi-value { color: var(--accent-warn); }
+  .kpi.ok     .kpi-value { color: var(--accent-ok); }
+  .kpi.blue   .kpi-value { color: var(--accent-blue); }
+  .kpi.cyan   .kpi-value { color: var(--accent-cyan); }
+
+  /* ── ROW LAYOUT ── */
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .row-3 { display: grid; grid-template-columns: 2fr 1.2fr 1fr; gap: 16px; }
+
+  /* ── PANEL ── */
+  .panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-dim);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--border-dim);
+  }
+  .panel-title { font-size: .85rem; font-weight: 600; letter-spacing: .3px; }
+  .panel-badge {
+    font-size: .7rem; font-family: var(--font-mono);
+    background: var(--bg-hover); padding: 2px 8px; border-radius: 20px;
+    color: var(--text-secondary);
+  }
+  .panel-badge.red { background: rgba(239,68,68,.15); color: var(--accent-danger); }
+  .panel-badge.amber { background: rgba(245,158,11,.15); color: var(--accent-warn); }
+  .panel-body { padding: 14px 18px; }
+
+  /* ── BAR CHART ── */
+  .bar-list { display: flex; flex-direction: column; gap: 10px; }
+  .bar-item { display: flex; flex-direction: column; gap: 4px; }
+  .bar-meta { display: flex; justify-content: space-between; font-size: .75rem; }
+  .bar-name { color: var(--text-primary); }
+  .bar-val  { color: var(--text-secondary); font-family: var(--font-mono); }
+  .bar-track {
+    height: 7px; background: var(--chart-bar); border-radius: 4px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+    transition: width .8s cubic-bezier(.4,0,.2,1);
+  }
+  .bar-fill.danger { background: linear-gradient(90deg, #b91c1c, var(--accent-danger)); }
+  .bar-fill.warn   { background: linear-gradient(90deg, #b45309, var(--accent-warn)); }
+  .bar-fill.ok     { background: linear-gradient(90deg, #15803d, var(--accent-ok)); }
+
+  /* ── MAP / REGION GRID ── */
+  .region-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .region-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 6px;
+    cursor: pointer; transition: border-color .15s;
+  }
+  .region-card:hover { border-color: var(--accent-blue); }
+  .region-card.critical { border-left: 3px solid var(--accent-danger); }
+  .region-card.warning  { border-left: 3px solid var(--accent-warn); }
+  .region-card.ok       { border-left: 3px solid var(--accent-ok); }
+  .region-name { font-size: .78rem; font-weight: 600; }
+  .region-stats { display: flex; gap: 8px; font-size: .7rem; color: var(--text-secondary); font-family: var(--font-mono); }
+  .region-rate  { font-size: .85rem; font-weight: 700; font-family: var(--font-mono); }
+  .region-rate.c { color: var(--accent-danger); }
+  .region-rate.w { color: var(--accent-warn); }
+  .region-rate.o { color: var(--accent-ok); }
+
+  /* ── TABLE ── */
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  th {
+    text-align: left; padding: 8px 12px;
+    font-size: .68rem; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--text-dim); font-weight: 500;
+    border-bottom: 1px solid var(--border-dim);
+    cursor: pointer; user-select: none;
+  }
+  th:hover { color: var(--text-secondary); }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border-dim); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(59,130,246,.04); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .4px;
+  }
+  .badge.atrasado  { background: rgba(239,68,68,.15); color: var(--accent-danger); }
+  .badge.entregue  { background: rgba(34,197,94,.12); color: var(--accent-ok); }
+  .badge.transito  { background: rgba(59,130,246,.12); color: var(--accent-blue); }
+  .badge.critico   { background: rgba(239,68,68,.25); color: #fca5a5; }
+  .priority-bar {
+    display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: .72rem;
+  }
+  .dots { display: flex; gap: 3px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+  .dot.filled { background: var(--accent-danger); }
+  .dot.warn   { background: var(--accent-warn); }
+
+  /* ── RANKING ── */
+  .ranking-list { display: flex; flex-direction: column; gap: 6px; }
+  .rank-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 7px;
+    background: var(--bg-panel); border: 1px solid transparent;
+    transition: border-color .15s;
+  }
+  .rank-item:hover { border-color: var(--border); }
+  .rank-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: .68rem; font-weight: 700; font-family: var(--font-mono);
+    flex-shrink: 0;
+  }
+  .rank-num.r1 { background: rgba(239,68,68,.2); color: var(--accent-danger); }
+  .rank-num.r2 { background: rgba(245,158,11,.2); color: var(--accent-warn); }
+  .rank-num.r3 { background: rgba(168,139,250,.2); color: var(--accent-purple); }
+  .rank-num.rn { background: var(--border-dim); color: var(--text-dim); }
+  .rank-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .rank-name { font-size: .78rem; font-weight: 500; }
+  .rank-detail { font-size: .68rem; color: var(--text-secondary); }
+  .rank-score {
+    font-family: var(--font-mono); font-size: .8rem; font-weight: 700;
+    color: var(--accent-danger);
+  }
+
+  /* ── TREND SPARKLINE (pure CSS/SVG) ── */
+  .sparkline-wrap { padding: 8px 18px 14px; }
+
+  /* ── ALERT STRIP ── */
+  .alert-strip {
+    background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.25);
+    border-radius: 8px;
+    padding: 10px 16px;
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: .78rem;
+  }
+  .alert-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+  .alert-text { line-height: 1.5; }
+  .alert-text strong { color: var(--accent-danger); }
+
+  /* ── DONUT SVG ── */
+  .donut-wrap { display: flex; align-items: center; gap: 18px; padding: 8px 0; }
+  .donut-legend { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: .75rem; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── MINI GAUGE ── */
+  .gauge-row { display: flex; flex-direction: column; gap: 8px; }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align: center; padding: 16px;
+    font-size: .7rem; color: var(--text-dim);
+    border-top: 1px solid var(--border-dim);
+    margin-top: 8px;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 1100px) {
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .row-3 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 700px) {
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    .row-2, .row-3 { grid-template-columns: 1fr; }
+    .filters { gap: 8px; }
+    .main { padding: 14px 14px; }
+    .topbar, .filters { padding-left: 14px; padding-right: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">🚚</div>
+    LogMonitor <span>/ Monitoramento de Entregas</span>
+  </div>
+  <div class="topbar-meta">
+    <span><span class="live-dot"></span> Ao vivo</span>
+    <span id="clock">—</span>
+    <span>Base: 40 entregas</span>
+  </div>
+</div>
+
+<!-- FILTERS -->
+<div class="filters">
+  <span class="filter-label">Filtros:</span>
+
+  <select id="fRegiao" onchange="applyFilters()">
+    <option value="">Todas as Regiões</option>
+    <option value="Norte">Norte</option>
+    <option value="Nordeste">Nordeste</option>
+    <option value="Centro-Oeste">Centro-Oeste</option>
+    <option value="Sudeste">Sudeste</option>
+    <option value="Sul">Sul</option>
+  </select>
+
+  <select id="fTransportadora" onchange="applyFilters()">
+    <option value="">Todas as Transportadoras</option>
+    <option value="TransBrasil">TransBrasil</option>
+    <option value="RapiLog">RapiLog</option>
+    <option value="VelozCarga">VelozCarga</option>
+    <option value="NorteExpress">NorteExpress</option>
+    <option value="SulFrete">SulFrete</option>
+  </select>
+
+  <select id="fStatus" onchange="applyFilters()">
+    <option value="">Todos os Status</option>
+    <option value="Atrasado">Atrasado</option>
+    <option value="Em Trânsito">Em Trânsito</option>
+    <option value="Entregue">Entregue</option>
+  </select>
+
+  <select id="fPrioridade" onchange="applyFilters()">
+    <option value="">Toda Prioridade</option>
+    <option value="5">Crítico (5)</option>
+    <option value="4">Alta (4)</option>
+    <option value="3">Média (3)</option>
+  </select>
+
+  <button class="btn-reset" onclick="resetFilters()">↺ Limpar filtros</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi blue">
+      <div class="kpi-label">Total de Entregas</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-sub">na seleção atual</div>
+    </div>
+    <div class="kpi danger">
+      <div class="kpi-label">Atrasadas</div>
+      <div class="kpi-value" id="kpi-atrasado">—</div>
+      <div class="kpi-sub" id="kpi-atrasado-pct">—</div>
+    </div>
+    <div class="kpi warn">
+      <div class="kpi-label">Em Trânsito</div>
+      <div class="kpi-value" id="kpi-transito">—</div>
+      <div class="kpi-sub" id="kpi-transito-pct">—</div>
+    </div>
+    <div class="kpi ok">
+      <div class="kpi-label">Entregues</div>
+      <div class="kpi-value" id="kpi-entregue">—</div>
+      <div class="kpi-sub" id="kpi-entregue-pct">—</div>
+    </div>
+    <div class="kpi cyan">
+      <div class="kpi-label">Atraso Médio</div>
+      <div class="kpi-value" id="kpi-atraso-medio">—</div>
+      <div class="kpi-sub">dias (atrasadas)</div>
+    </div>
+  </div>
+
+  <!-- ALERT -->
+  <div class="alert-strip" id="alert-box">
+    <div class="alert-icon">⚠️</div>
+    <div class="alert-text" id="alert-text">—</div>
+  </div>
+
+  <!-- ROW 1: Bar charts + Donut + Ranking transportadoras -->
+  <div class="row-3">
+
+    <!-- Atrasos por Transportadora -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Atrasos por Transportadora</div>
+        <div class="panel-badge red" id="badge-transp">—</div>
+      </div>
+      <div class="panel-body">
+        <div class="bar-list" id="chart-transportadora"></div>
+      </div>
+    </div>
+
+    <!-- Status Geral (donut) -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Distribuição de Status</div>
+        <div class="panel-badge" id="badge-status-total">—</div>
+      </div>
+      <div class="panel-body">
+        <div class="donut-wrap">
+          <svg id="donut-svg" width="100" height="100" viewBox="0 0 100 100"></svg>
+          <div class="donut-legend" id="donut-legend"></div>
+        </div>
+      </div>
+      <div class="panel-header" style="border-top:1px solid var(--border-dim); border-bottom:none; margin-top:4px;">
+        <div class="panel-title">Taxa de Atraso por Prioridade</div>
+      </div>
+      <div class="panel-body">
+        <div class="gauge-row" id="gauge-prioridade"></div>
+      </div>
+    </div>
+
+    <!-- Ranking de Problemas -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🔴 Problemas Críticos</div>
+        <div class="panel-badge red" id="badge-criticos">—</div>
+      </div>
+      <div class="panel-body">
+        <div class="ranking-list" id="ranking-criticos"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ROW 2: Regiões + Sparkline -->
+  <div class="row-2">
+
+    <!-- Análise por Região -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Análise por Região</div>
+        <div class="panel-badge amber">5 regiões</div>
+      </div>
+      <div class="panel-body">
+        <div class="region-grid" id="region-grid"></div>
+      </div>
+    </div>
+
+    <!-- Tendência Semanal -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Atrasos Acumulados — Tendência Semanal</div>
+      </div>
+      <div class="sparkline-wrap">
+        <svg id="spark-svg" width="100%" height="140" viewBox="0 0 460 140" preserveAspectRatio="none"></svg>
+        <div style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--text-dim);padding:0 2px;margin-top:4px;" id="spark-labels"></div>
+      </div>
+      <div class="panel-header" style="border-top:1px solid var(--border-dim); border-bottom:none;">
+        <div class="panel-title">Atrasos por Dia da Semana</div>
+      </div>
+      <div class="panel-body">
+        <div class="bar-list" id="chart-weekday"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TABLE -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">Detalhamento de Entregas</div>
+      <div class="panel-badge" id="badge-table">—</div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="entregas-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('id')">ID ↕</th>
+            <th onclick="sortTable('transportadora')">Transportadora ↕</th>
+            <th onclick="sortTable('regiao')">Região ↕</th>
+            <th onclick="sortTable('status')">Status ↕</th>
+            <th onclick="sortTable('diasAtraso')">Atraso (dias) ↕</th>
+            <th onclick="sortTable('prioridade')">Prioridade ↕</th>
+            <th>Indicador</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">LogMonitor · Dashboard Logístico · Dados simulados para fins didáticos · Atualizado em tempo real</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const DADOS = [
+  {id:"E001",transportadora:"TransBrasil",regiao:"Sudeste",status:"Atrasado",diasAtraso:5,prioridade:5,dia:"Seg"},
+  {id:"E002",transportadora:"RapiLog",regiao:"Nordeste",status:"Entregue",diasAtraso:0,prioridade:2,dia:"Ter"},
+  {id:"E003",transportadora:"VelozCarga",regiao:"Sul",status:"Em Trânsito",diasAtraso:1,prioridade:3,dia:"Qua"},
+  {id:"E004",transportadora:"TransBrasil",regiao:"Norte",status:"Atrasado",diasAtraso:8,prioridade:5,dia:"Qui"},
+  {id:"E005",transportadora:"NorteExpress",regiao:"Norte",status:"Atrasado",diasAtraso:3,prioridade:4,dia:"Sex"},
+  {id:"E006",transportadora:"SulFrete",regiao:"Sul",status:"Entregue",diasAtraso:0,prioridade:1,dia:"Seg"},
+  {id:"E007",transportadora:"TransBrasil",regiao:"Centro-Oeste",status:"Atrasado",diasAtraso:6,prioridade:5,dia:"Ter"},
+  {id:"E008",transportadora:"RapiLog",regiao:"Sudeste",status:"Em Trânsito",diasAtraso:2,prioridade:3,dia:"Qua"},
+  {id:"E009",transportadora:"VelozCarga",regiao:"Nordeste",status:"Atrasado",diasAtraso:4,prioridade:4,dia:"Qui"},
+  {id:"E010",transportadora:"NorteExpress",regiao:"Norte",status:"Atrasado",diasAtraso:10,prioridade:5,dia:"Sex"},
+  {id:"E011",transportadora:"SulFrete",regiao:"Sul",status:"Em Trânsito",diasAtraso:0,prioridade:2,dia:"Seg"},
+  {id:"E012",transportadora:"TransBrasil",regiao:"Sudeste",status:"Entregue",diasAtraso:0,prioridade:1,dia:"Ter"},
+  {id:"E013",transportadora:"RapiLog",regiao:"Centro-Oeste",status:"Atrasado",diasAtraso:7,prioridade:5,dia:"Qua"},
+  {id:"E014",transportadora:"VelozCarga",regiao:"Sul",status:"Entregue",diasAtraso:0,prioridade:2,dia:"Qui"},
+  {id:"E015",transportadora:"NorteExpress",regiao:"Nordeste",status:"Atrasado",diasAtraso:5,prioridade:4,dia:"Sex"},
+  {id:"E016",transportadora:"SulFrete",regiao:"Sudeste",status:"Atrasado",diasAtraso:2,prioridade:3,dia:"Seg"},
+  {id:"E017",transportadora:"TransBrasil",regiao:"Norte",status:"Em Trânsito",diasAtraso:1,prioridade:3,dia:"Ter"},
+  {id:"E018",transportadora:"RapiLog",regiao:"Sul",status:"Entregue",diasAtraso:0,prioridade:1,dia:"Qua"},
+  {id:"E019",transportadora:"VelozCarga",regiao:"Centro-Oeste",status:"Atrasado",diasAtraso:9,prioridade:5,dia:"Qui"},
+  {id:"E020",transportadora:"NorteExpress",regiao:"Sudeste",status:"Em Trânsito",diasAtraso:0,prioridade:2,dia:"Sex"},
+  {id:"E021",transportadora:"SulFrete",regiao:"Nordeste",status:"Atrasado",diasAtraso:3,prioridade:4,dia:"Seg"},
+  {id:"E022",transportadora:"TransBrasil",regiao:"Sudeste",status:"Atrasado",diasAtraso:4,prioridade:4,dia:"Ter"},
+  {id:"E023",transportadora:"RapiLog",regiao:"Norte",status:"Entregue",diasAtraso:0,prioridade:1,dia:"Qua"},
+  {id:"E024",transportadora:"VelozCarga",regiao:"Nordeste",status:"Atrasado",diasAtraso:6,prioridade:5,dia:"Qui"},
+  {id:"E025",transportadora:"NorteExpress",regiao:"Centro-Oeste",status:"Atrasado",diasAtraso:5,prioridade:4,dia:"Sex"},
+  {id:"E026",transportadora:"SulFrete",regiao:"Sul",status:"Entregue",diasAtraso:0,prioridade:2,dia:"Seg"},
+  {id:"E027",transportadora:"TransBrasil",regiao:"Nordeste",status:"Atrasado",diasAtraso:7,prioridade:5,dia:"Ter"},
+  {id:"E028",transportadora:"RapiLog",regiao:"Sudeste",status:"Atrasado",diasAtraso:3,prioridade:3,dia:"Qua"},
+  {id:"E029",transportadora:"VelozCarga",regiao:"Norte",status:"Em Trânsito",diasAtraso:1,prioridade:2,dia:"Qui"},
+  {id:"E030",transportadora:"NorteExpress",regiao:"Sul",status:"Atrasado",diasAtraso:4,prioridade:4,dia:"Sex"},
+  {id:"E031",transportadora:"SulFrete",regiao:"Centro-Oeste",status:"Entregue",diasAtraso:0,prioridade:1,dia:"Seg"},
+  {id:"E032",transportadora:"TransBrasil",regiao:"Sul",status:"Atrasado",diasAtraso:2,prioridade:3,dia:"Ter"},
+  {id:"E033",transportadora:"RapiLog",regiao:"Norte",status:"Atrasado",diasAtraso:8,prioridade:5,dia:"Qua"},
+  {id:"E034",transportadora:"VelozCarga",regiao:"Sudeste",status:"Entregue",diasAtraso:0,prioridade:1,dia:"Qui"},
+  {id:"E035",transportadora:"NorteExpress",regiao:"Nordeste",status:"Atrasado",diasAtraso:6,prioridade:5,dia:"Sex"},
+  {id:"E036",transportadora:"SulFrete",regiao:"Norte",status:"Em Trânsito",diasAtraso:0,prioridade:2,dia:"Seg"},
+  {id:"E037",transportadora:"TransBrasil",regiao:"Centro-Oeste",status:"Entregue",diasAtraso:0,prioridade:1,dia:"Ter"},
+  {id:"E038",transportadora:"RapiLog",regiao:"Sudeste",status:"Atrasado",diasAtraso:5,prioridade:4,dia:"Qua"},
+  {id:"E039",transportadora:"VelozCarga",regiao:"Sul",status:"Atrasado",diasAtraso:3,prioridade:3,dia:"Qui"},
+  {id:"E040",transportadora:"NorteExpress",regiao:"Centro-Oeste",status:"Atrasado",diasAtraso:7,prioridade:5,dia:"Sex"},
+];
+
+let filtered = [...DADOS];
+let sortKey = 'prioridade';
+let sortDir = -1;
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function updateClock(){
+  const d = new Date();
+  document.getElementById('clock').textContent =
+    d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateClock,1000); updateClock();
+
+// ── FILTERS ───────────────────────────────────────────────────────────────────
+function applyFilters(){
+  const r = document.getElementById('fRegiao').value;
+  const t = document.getElementById('fTransportadora').value;
+  const s = document.getElementById('fStatus').value;
+  const p = document.getElementById('fPrioridade').value;
+  filtered = DADOS.filter(d =>
+    (!r || d.regiao===r) &&
+    (!t || d.transportadora===t) &&
+    (!s || d.status===s) &&
+    (!p || d.prioridade===parseInt(p))
+  );
+  render();
+}
+function resetFilters(){
+  ['fRegiao','fTransportadora','fStatus','fPrioridade'].forEach(id=>document.getElementById(id).value='');
+  filtered=[...DADOS]; render();
+}
+
+// ── SORT ──────────────────────────────────────────────────────────────────────
+function sortTable(key){
+  if(sortKey===key) sortDir*=-1; else { sortKey=key; sortDir=-1; }
+  render();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render(){
+  const data = [...filtered].sort((a,b)=>{
+    const av=a[sortKey], bv=b[sortKey];
+    return typeof av==='number'?(av-bv)*sortDir:(av<bv?-1:1)*sortDir;
+  });
+
+  const total    = data.length;
+  const atrasado = data.filter(d=>d.status==='Atrasado').length;
+  const transito = data.filter(d=>d.status==='Em Trânsito').length;
+  const entregue = data.filter(d=>d.status==='Entregue').length;
+  const diasArr  = data.filter(d=>d.status==='Atrasado').map(d=>d.diasAtraso);
+  const mediaAtr = diasArr.length ? (diasArr.reduce((a,b)=>a+b,0)/diasArr.length).toFixed(1) : 0;
+  const pct = n => total ? Math.round(n/total*100)+'%' : '0%';
+
+  // KPIs
+  setText('kpi-total', total);
+  setText('kpi-atrasado', atrasado);
+  setText('kpi-atrasado-pct', pct(atrasado)+' do total');
+  setText('kpi-transito', transito);
+  setText('kpi-transito-pct', pct(transito)+' do total');
+  setText('kpi-entregue', entregue);
+  setText('kpi-entregue-pct', pct(entregue)+' do total');
+  setText('kpi-atraso-medio', mediaAtr + 'd');
+
+  // Alert
+  const criticos = data.filter(d=>d.status==='Atrasado'&&d.prioridade>=5);
+  const alertBox = document.getElementById('alert-box');
+  const alertTxt = document.getElementById('alert-text');
+  if(criticos.length>0){
+    alertBox.style.display='flex';
+    alertTxt.innerHTML = `<strong>${criticos.length} entrega(s) com prioridade crítica</strong> estão atrasadas. Maior atraso: <strong>${Math.max(...criticos.map(d=>d.diasAtraso))} dias</strong> (${criticos.sort((a,b)=>b.diasAtraso-a.diasAtraso)[0].transportadora} · ${criticos[0].regiao}). Requer ação imediata.`;
+  } else {
+    alertBox.style.display='none';
+  }
+
+  // Transportadora bar chart
+  const transp = {};
+  data.forEach(d=>{
+    if(!transp[d.transportadora]) transp[d.transportadora]={tot:0,atr:0,dias:0};
+    transp[d.transportadora].tot++;
+    if(d.status==='Atrasado'){transp[d.transportadora].atr++;transp[d.transportadora].dias+=d.diasAtraso;}
+  });
+  const transpArr = Object.entries(transp).map(([k,v])=>({name:k,...v,rate:v.tot?Math.round(v.atr/v.tot*100):0}))
+    .sort((a,b)=>b.atr-a.atr);
+  const maxAtr = Math.max(...transpArr.map(t=>t.atr),1);
+  setText('badge-transp', transpArr.length+' transportadoras');
+  document.getElementById('chart-transportadora').innerHTML = transpArr.map(t=>{
+    const cls = t.rate>=60?'danger':t.rate>=35?'warn':'ok';
+    return `<div class="bar-item">
+      <div class="bar-meta"><span class="bar-name">${t.name}</span><span class="bar-val">${t.atr} atrasos · ${t.rate}%</span></div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.round(t.atr/maxAtr*100)}%"></div></div>
+    </div>`;
+  }).join('');
+
+  // Donut
+  renderDonut(atrasado, transito, entregue, total);
+  setText('badge-status-total', total+' entregas');
+
+  // Prioridade gauges
+  const prios = [5,4,3,2,1];
+  document.getElementById('gauge-prioridade').innerHTML = prios.map(p=>{
+    const items = data.filter(d=>d.prioridade===p);
+    if(!items.length) return '';
+    const atrP = items.filter(d=>d.status==='Atrasado').length;
+    const rateP = items.length ? Math.round(atrP/items.length*100) : 0;
+    const lblMap = {5:'Crítica',4:'Alta',3:'Média',2:'Baixa',1:'Mínima'};
+    const cls = p>=5?'danger':p>=4?'warn':'ok';
+    return `<div class="bar-item">
+      <div class="bar-meta"><span class="bar-name">P${p} ${lblMap[p]}</span><span class="bar-val">${atrP}/${items.length} · ${rateP}%</span></div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${rateP}%"></div></div>
+    </div>`;
+  }).join('');
+
+  // Ranking críticos
+  const rankData = data.filter(d=>d.status==='Atrasado').sort((a,b)=>b.prioridade-a.prioridade||b.diasAtraso-a.diasAtraso).slice(0,6);
+  setText('badge-criticos', rankData.length+' itens');
+  document.getElementById('ranking-criticos').innerHTML = rankData.map((d,i)=>{
+    const cls = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
+    return `<div class="rank-item">
+      <div class="rank-num ${cls}">${i+1}</div>
+      <div class="rank-info">
+        <div class="rank-name">${d.id} · ${d.transportadora}</div>
+        <div class="rank-detail">${d.regiao} · Prioridade ${d.prioridade}</div>
+      </div>
+      <div class="rank-score">+${d.diasAtraso}d</div>
+    </div>`;
+  }).join('');
+
+  // Region grid
+  const regioes = {};
+  data.forEach(d=>{
+    if(!regioes[d.regiao]) regioes[d.regiao]={tot:0,atr:0,dias:0};
+    regioes[d.regiao].tot++;
+    if(d.status==='Atrasado'){regioes[d.regiao].atr++;regioes[d.regiao].dias+=d.diasAtraso;}
+  });
+  document.getElementById('region-grid').innerHTML = Object.entries(regioes).map(([r,v])=>{
+    const rate = v.tot?Math.round(v.atr/v.tot*100):0;
+    const cls = rate>=60?'critical':rate>=35?'warning':'ok';
+    const rcls = rate>=60?'c':rate>=35?'w':'o';
+    const icons = {Norte:'🌿',Nordeste:'🌵',Sudeste:'🏙️','Centro-Oeste':'🌾',Sul:'⛰️'};
+    return `<div class="region-card ${cls}" onclick="filterRegion('${r}')">
+      <div class="region-name">${icons[r]||'📍'} ${r}</div>
+      <div class="region-stats"><span>${v.tot} entregas</span><span>${v.atr} atrasos</span></div>
+      <div class="region-rate ${rcls}">${rate}% atraso</div>
+    </div>`;
+  }).join('');
+
+  // Sparkline tendência semanal
+  const weekTrend = [3,5,4,7,6,8,10]; // simulado crescente
+  const weekLabels = ['S1','S2','S3','S4','S5','S6','S7'];
+  renderSparkline(weekTrend, weekLabels);
+
+  // Weekday bars
+  const diasSemana = ['Seg','Ter','Qua','Qui','Sex'];
+  const wdCount = {};
+  diasSemana.forEach(d=>{ wdCount[d]=0; });
+  data.filter(d=>d.status==='Atrasado').forEach(d=>{ if(wdCount[d.dia]!==undefined) wdCount[d.dia]++; });
+  const maxWd = Math.max(...Object.values(wdCount),1);
+  document.getElementById('chart-weekday').innerHTML = diasSemana.map(wd=>{
+    const v = wdCount[wd];
+    const pct2 = Math.round(v/maxWd*100);
+    return `<div class="bar-item">
+      <div class="bar-meta"><span class="bar-name">${wd}</span><span class="bar-val">${v} atrasos</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct2}%"></div></div>
+    </div>`;
+  }).join('');
+
+  // Table
+  setText('badge-table', data.length+' registros');
+  document.getElementById('table-body').innerHTML = data.map(d=>{
+    const statusCls = d.status==='Atrasado'?'atrasado':d.status==='Entregue'?'entregue':'transito';
+    const prioLabel = d.prioridade>=5?'critico':'';
+    const dotsFilled = d.prioridade;
+    const dots = Array.from({length:5},(_,i)=>`<div class="dot ${i<dotsFilled?(d.prioridade>=5?'filled':'warn'):''}"></div>`).join('');
+    return `<tr>
+      <td style="font-family:var(--font-mono);font-size:.75rem;color:var(--text-secondary)">${d.id}</td>
+      <td>${d.transportadora}</td>
+      <td>${d.regiao}</td>
+      <td><span class="badge ${statusCls}">${d.status}</span></td>
+      <td style="font-family:var(--font-mono);color:${d.diasAtraso>5?'var(--accent-danger)':d.diasAtraso>0?'var(--accent-warn)':'var(--accent-ok)'}">${d.diasAtraso>0?'+'+d.diasAtraso+'d':'—'}</td>
+      <td><span class="badge ${prioLabel}" style="${!prioLabel?'background:var(--bg-panel);color:var(--text-secondary)':''}">${d.prioridade}</span></td>
+      <td><div class="priority-bar"><div class="dots">${dots}</div></div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── DONUT ─────────────────────────────────────────────────────────────────────
+function renderDonut(atr,tra,ent,tot){
+  if(!tot){ document.getElementById('donut-svg').innerHTML=''; return; }
+  const segs = [
+    {val:atr,color:'#ef4444',label:'Atrasado'},
+    {val:tra,color:'#3b82f6',label:'Em Trânsito'},
+    {val:ent,color:'#22c55e',label:'Entregue'},
+  ].filter(s=>s.val>0);
+  const cx=50,cy=50,r=38,ir=24;
+  let angle=-Math.PI/2;
+  let paths='';
+  segs.forEach(s=>{
+    const sweep = (s.val/tot)*2*Math.PI;
+    const x1=cx+r*Math.cos(angle), y1=cy+r*Math.sin(angle);
+    const x2=cx+r*Math.cos(angle+sweep), y2=cy+r*Math.sin(angle+sweep);
+    const ix1=cx+ir*Math.cos(angle), iy1=cy+ir*Math.sin(angle);
+    const ix2=cx+ir*Math.cos(angle+sweep), iy2=cy+ir*Math.sin(angle+sweep);
+    const large=sweep>Math.PI?1:0;
+    paths+=`<path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} L${ix2},${iy2} A${ir},${ir} 0 ${large},0 ${ix1},${iy1} Z" fill="${s.color}" opacity=".85"/>`;
+    angle+=sweep;
+  });
+  paths+=`<text x="50" y="54" text-anchor="middle" font-size="14" font-weight="700" fill="#e8f0fe" font-family="JetBrains Mono,monospace">${tot}</text>`;
+  document.getElementById('donut-svg').innerHTML=paths;
+  document.getElementById('donut-legend').innerHTML=segs.map(s=>
+    `<div class="legend-item"><div class="legend-dot" style="background:${s.color}"></div><span>${s.label}: <strong>${s.val}</strong> (${Math.round(s.val/tot*100)}%)</span></div>`
+  ).join('');
+}
+
+// ── SPARKLINE ─────────────────────────────────────────────────────────────────
+function renderSparkline(vals, labels){
+  const w=460,h=130,pad=20;
+  const mn=Math.min(...vals), mx=Math.max(...vals);
+  const xs=vals.map((_,i)=>pad+(i/(vals.length-1))*(w-pad*2));
+  const ys=vals.map(v=>h-pad-(v-mn)/(mx-mn||1)*(h-pad*2));
+  let path=`M${xs[0]},${ys[0]}`;
+  for(let i=1;i<xs.length;i++){
+    const cpx=(xs[i-1]+xs[i])/2;
+    path+=` C${cpx},${ys[i-1]} ${cpx},${ys[i]} ${xs[i]},${ys[i]}`;
+  }
+  let fill=path+` L${xs[xs.length-1]},${h} L${xs[0]},${h} Z`;
+  const svg=document.getElementById('spark-svg');
+  svg.innerHTML=`
+    <defs>
+      <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ef4444" stop-opacity=".35"/>
+        <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${fill}" fill="url(#sg)"/>
+    <path d="${path}" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>
+    ${xs.map((x,i)=>`<circle cx="${x}" cy="${ys[i]}" r="4" fill="#ef4444" stroke="#0b0f1a" stroke-width="2"/>
+      <text x="${x}" y="${ys[i]-9}" text-anchor="middle" font-size="11" fill="#e8f0fe" font-family="JetBrains Mono,monospace">${vals[i]}</text>`).join('')}
+  `;
+  document.getElementById('spark-labels').innerHTML=labels.map(l=>`<span>${l}</span>`).join('');
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function setText(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; }
+function filterRegion(r){ document.getElementById('fRegiao').value=r; applyFilters(); }
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
